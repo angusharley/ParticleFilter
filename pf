@@ -1,0 +1,442 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+from PIL import Image
+
+
+
+num_particles = 25**2
+noise_var_part = 1
+likelihood_prec = 0.15
+
+# Gaussian Blob synthetic input
+
+
+def get_next_centre(time_step, noise_var, u=np.transpose(np.array([0, 0, 0, 0])[np.newaxis])):
+    matrix_1 = np.array([1, 0, time_step, 0, 0, 1, 0, time_step, 0, 0, 1, 0, 0, 0, 0, 1]).reshape(4, 4)
+
+    matrix_2 = np.array([0, 0, 0, 0, noise_var, 0, 0, noise_var]).reshape(4, 2)
+
+    noise = np.random.randn(2, 1)
+
+    next_centre = np.add(np.matmul(matrix_1, u), np.matmul(matrix_2, noise))
+
+    return next_centre
+
+
+def get_next_centre_3d(time_step, noise_var, noise_var_z, u=np.transpose(np.array([0, 0, 0, 0, 0, 0])[np.newaxis])):
+
+    matrix_1 = np.array([1, 0, 0, time_step, 0, 0, 0, 1, 0, 0, time_step, 0, 0, 0, 1, 0, 0, time_step, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1]).reshape(6, 6)
+
+    matrix_2 = np.array([0, 0, 0, 0, 0, 0, noise_var, 0, 0, 0, noise_var, 0, 0, 0, noise_var_z]).reshape(6, 3)
+
+    noise = np.random.randn(3, 1)
+
+    next_centre = np.add(np.matmul(matrix_1, u), np.matmul(matrix_2, noise))
+
+    return next_centre
+
+
+def gaussian_blob(n, x_pixel_number = 356, y_pixel_number = 200, gauss_prec = 150, time_s = 0.05, noise_vari = 0.5, three_d = 0, z_pixel_number = 8, noise_var_z = 0.001):
+
+    if three_d == 0:
+        n_c = np.transpose(np.array([0, 0, 0, 0])[np.newaxis])
+
+        cords_1 = [n_c[0], n_c[1]]
+
+        for j in range(n-1):
+            n_c = get_next_centre(time_s, noise_vari, n_c)
+            cords_1.append(n_c[0])
+            cords_1.append(n_c[1])
+
+        array_cords = np.array(cords_1).reshape(n, 2)
+
+        x_values = [array_cords[i][0] for i in range(len(array_cords))]
+        y_values = [array_cords[i][1] for i in range(len(array_cords))]
+
+        x_range = max(x_values) - min(x_values)
+        y_range = max(y_values) - min(y_values)
+
+        x = np.linspace((min(x_values)-(x_range/2)), (max(x_values)+(x_range/2)), x_pixel_number)
+        y = np.linspace((min(y_values)-(y_range/2)), (max(y_values)+(y_range/2)), y_pixel_number)
+
+        pixel_values = []
+
+        for p in range(n):
+            for q in range(len(y)):
+                y_cord = y[q]
+                for i in range(len(x)):
+                    pixel_values.append(
+                        255 * np.exp(-0.5 * gauss_prec * ((x[i] - x_values[p]) ** 2 + (y_cord - y_values[p]) ** 2)))
+
+        image_array = np.array(pixel_values).reshape(n, y_pixel_number, x_pixel_number)
+
+        plt.figure(0)
+        plt.imshow(image_array[0], cmap=cm.gray)
+
+    elif three_d == 1:
+        n_c = np.transpose(np.array([0, 0, 0, 0, 0, 0])[np.newaxis])
+
+        cords_1 = [n_c[0], n_c[1], n_c[2]]
+
+        for j in range(n - 1):
+            n_c = get_next_centre_3d(time_s, noise_vari, noise_var_z, n_c)
+            cords_1.append(n_c[0])
+            cords_1.append(n_c[1])
+            cords_1.append(n_c[2])
+
+        array_cords = np.array(cords_1).reshape(n, 3)
+
+        x_values = [array_cords[i][0] for i in range(len(array_cords))]
+        y_values = [array_cords[i][1] for i in range(len(array_cords))]
+        z_values = [array_cords[i][2] for i in range(len(array_cords))]
+
+        x_range = max(x_values) - min(x_values)
+        y_range = max(y_values) - min(y_values)
+        z_range = max(z_values) - min(z_values)
+
+        x = np.linspace((min(x_values) - (x_range / 2)), (max(x_values) + (x_range / 2)), x_pixel_number)
+        y = np.linspace((min(y_values) - (y_range / 2)), (max(y_values) + (y_range / 2)), y_pixel_number)
+        z = np.linspace((min(z_values) - (z_range / 2)), (max(z_values) + (z_range / 2)), z_pixel_number)
+
+        pixel_values = []
+
+        for p in range(n):
+            for q in range(len(y)):
+                y_cord = y[q]
+                for i in range(len(x)):
+                    for b in range(len(z)):
+                        pixel_values.append(
+                            255 * np.exp(-0.5 * gauss_prec * ((x[i] - x_values[p]) ** 2 + (y_cord - y_values[p]) ** 2)))
+
+        image_array = np.array(pixel_values).reshape(n, y_pixel_number, x_pixel_number)
+
+    return image_array
+
+
+def image_to_pixels(image_file):
+
+    im = Image.open(image_file)
+
+    width, height = im.size
+
+    pixel_list1 = list(im.getdata())
+
+    pixel_array1 = np.array(pixel_list1).reshape(height, width)
+
+    #plt.imshow(pixel_array1, cmap=cm.gray)
+    #plt.show()
+
+    #return pixel_array1
+    return pixel_list1
+
+
+def percentile_normalisation(img_arr):
+
+    # Normalize the image using percentiles
+    lo, hi = np.percentile(img_arr, (1, 99))
+    image_norm_percentile = (img_arr - lo) / (hi - lo)
+
+    print(image_norm_percentile)
+
+
+
+
+
+
+# Initialise Particles according to uniform distribution.
+
+
+
+#def particle_filter(single_image_array, particles, particles_set, max_pixel):
+def particle_filter(single_image_array, particles, particles_set):
+
+
+    def _plot_particles(particles, num_particles):
+
+        plt.figure()
+        x_values_particles = [particles[h][0] for h in range(num_particles)]
+        y_values_particles = [particles[h][1] for h in range(num_particles)]
+
+        plt.scatter(x_values_particles, y_values_particles, s=2.5)
+
+    # Load Image and update weights according the likelihood.
+
+    # Threshold: (245 for Gaussian Blob, 43000 for Larva)
+
+
+    #threshold_value = 0.9*max_pixel
+    threshold_value = 245
+
+    threshold_pixels_list = []
+
+
+
+    for v in range(len(single_image_array)):
+        for c in range(len(single_image_array[0])):
+
+
+            if single_image_array[v][c] >= threshold_value:
+                threshold_pixels_list.append(255)
+            else:
+                threshold_pixels_list.append(0)
+
+    threshold_image_array = np.array(threshold_pixels_list).reshape(len(single_image_array), len(single_image_array[0]))
+
+    if particles_set == 0:
+        plt.figure(1)
+        plt.imshow(threshold_image_array, cmap=cm.gray)
+
+    # Find midpoint for likelihood function
+
+    y_midpoint_min = None
+    y_midpoint_max = None
+    x_midpoint_min = len(threshold_image_array[0])
+    x_midpoint_max = 0
+
+    for g in range(len(threshold_image_array)):
+        for h in range(len(threshold_image_array[0])):
+            if y_midpoint_min == None and threshold_image_array[g][h] == 255:
+                y_midpoint_min = g
+                y_midpoint_max = g
+            if threshold_image_array[g][h] == 255 and g > y_midpoint_max and y_midpoint_min != None:
+                y_midpoint_max = g
+            if threshold_image_array[g][h] == 255 and h < x_midpoint_min:
+                x_midpoint_min = h
+            if threshold_image_array[g][h] == 255 and h > x_midpoint_max:
+                x_midpoint_max = h
+
+    # print(y_midpoint_min, y_midpoint_max, x_midpoint_min, x_midpoint_max)
+
+    crude_midpoint = np.array([(x_midpoint_max + x_midpoint_min)/2, (y_midpoint_max + y_midpoint_min)/2])
+    if particles_set == 0:
+        plt.figure(2)
+        plt.plot(crude_midpoint[0], crude_midpoint[1], 'go')
+        plt.imshow(threshold_image_array, cmap=cm.gray)
+
+
+
+    '''Initiate particles according to crude midpoint if no particles already'''
+
+    if particles_set == 0:
+        particle_x = np.linspace(crude_midpoint[0] - 0.1*len(single_image_array[0]), crude_midpoint[0] + 0.1*len(single_image_array[0]), int(np.sqrt(num_particles)))
+        particle_y = np.linspace(crude_midpoint[1] - 0.1*len(single_image_array), crude_midpoint[1] + 0.1*len(single_image_array), int(np.sqrt(num_particles)))
+
+        #particle_x = np.linspace(0, len(single_image_array[0]), int(np.sqrt(num_particles)))
+        #particle_y = np.linspace(0, len(single_image_array), int(np.sqrt(num_particles)))
+
+
+        particles_list = []
+        for j in range(len(particle_x)):
+            for l in range(len(particle_y)):
+                particles_list.append(particle_x[j])
+                particles_list.append(particle_y[l])
+                particles_list.append(noise_var_part * np.random.randn())
+                particles_list.append(noise_var_part * np.random.randn())
+
+        particles = np.array(particles_list).reshape(num_particles, 4)
+
+        x_values_particles1 = [particles[h][0] for h in range(num_particles)]
+        y_values_particles1 = [particles[h][1] for h in range(num_particles)]
+
+        plt.figure(3)
+        plt.scatter(x_values_particles1, y_values_particles1, s=5)
+
+        #_plot_particles(particles, num_particles)
+
+
+    # Move Particles according to state space model.
+
+    temp_particles = []
+    for q in range(num_particles):
+        temp_particles.append(
+            get_next_centre(1, noise_var_part, np.transpose(np.array(particles[q])[np.newaxis])))
+
+    particles = np.array(temp_particles).reshape(num_particles, 4)
+
+    if particles_set == 0:
+        _plot_particles(particles, num_particles)
+        _plot_particles(particles, num_particles)
+        plt.imshow(single_image_array, cmap=cm.gray)
+
+
+
+
+    weights = np.transpose(np.array([1 / num_particles for i in range(num_particles)])[np.newaxis])
+
+    # Update weights according to likelihood:
+
+    weight_sum = 0
+
+    for w_i in range(num_particles):
+        weights[w_i] = np.exp(-0.5 * likelihood_prec * ((particles[w_i][0] - crude_midpoint[0])**2 + (particles[w_i][1] - crude_midpoint[1])**2))
+        weight_sum += weights[w_i]
+
+
+
+    # Plot particles scaled by weights
+
+    x_values_particles = []
+    y_values_particles = []
+
+    for p in range(num_particles):
+        if particles[p][0] == 0 and particles[p][1] == 0:
+            pass
+        else:
+            x_values_particles.append(particles[p][0])
+            y_values_particles.append(particles[p][1])
+
+
+
+    #x_values_particles = [particles[h][0] for h in range(num_particles)]
+    #y_values_particles = [particles[h][1] for h in range(num_particles)]
+
+    plt.figure()
+
+    if particles_set == 0:
+        plt.scatter(x_values_particles, y_values_particles, s=weights * 500)
+        plt.imshow(single_image_array, cmap=cm.gray)
+        plt.figure()
+        plt.scatter(x_values_particles, y_values_particles, s=weights * 500)
+
+    else:
+        plt.scatter(x_values_particles, y_values_particles, s=5)
+
+
+    # Normalise weights:
+
+    for w_j in range(num_particles):
+        weights[w_j] = weights[w_j] / weight_sum
+
+
+    '''Sort particles according to weight'''
+    '''
+    weight_list = []
+    for ele in range(num_particles):
+        weight_list.append(weights[ele][0])
+
+    print(weight_list)
+
+    sorted_weights = sorted(weight_list)
+    median_weight = sorted_weights[int(num_particles*6/10)]
+    median_weight2 = weights[int(num_particles*6/10)]
+    print(median_weight2)
+    print(median_weight)
+    big_weight_indexs = []
+    for w_k in range(num_particles):
+        if weights[w_k] > median_weight:
+            big_weight_indexs.append(w_k)
+
+    print(big_weight_indexs)
+    '''
+
+    '''
+
+    for w_k in range(num_particles):
+        if weights[w_k] <= 2*(1/num_particles):
+            i = np.random.choice(big_weight_indexs)
+            print(i)
+            particles[w_k][0] = particles[i][0] + 4*np.random.randn()
+            particles[w_k][1] = particles[i][1] + 4*np.random.randn()
+            particles[w_k][2] = particles[i][2]
+            particles[w_k][3] = particles[i][3]
+            weight_sum -= weights[w_k]
+            weights[w_k] = 0
+            #weights[w_k] = weights[i]
+            #weight_sum += weights[w_k]
+    
+
+    # Normalise weights: Need to unnormalise weights again first
+
+    for w_j in range(num_particles):
+        weights[w_j] = weights[w_j] / weight_sum
+    '''
+
+    # Generate Predicted Midpoint
+
+    pred_midpoint_x = 0
+    pred_midpoint_y = 0
+
+    for t in range(num_particles):
+        pred_midpoint_x += particles[t][0]*weights[t]
+        pred_midpoint_y += particles[t][1]*weights[t]
+
+
+    # Resample particles according to weights
+
+    for w_k in range(num_particles):
+        if weights[w_k] <= 2*(1/num_particles):
+            particles[w_k][0] = pred_midpoint_x + 3*np.random.randn()
+            particles[w_k][1] = pred_midpoint_y + 3*np.random.randn()
+
+
+
+    plt.plot(pred_midpoint_x, pred_midpoint_y, 'ro')
+    plt.imshow(single_image_array, cmap=cm.gray)
+
+    if particles_set == 0:
+        _plot_particles(particles, num_particles)
+        plt.plot(pred_midpoint_x, pred_midpoint_y, 'ro')
+        plt.imshow(single_image_array, cmap=cm.gray)
+
+
+    return particles
+
+
+image_array = gaussian_blob(30)
+
+'''
+image_pixel_list = []
+
+for i in range(1, 10):
+    if i == 1:
+        im1 = Image.open('img_001.tif')
+        width, height = im1.size
+
+    pixel_list = image_to_pixels('img_00{}.tif'.format(i))
+    for l in range(len(pixel_list)):
+        image_pixel_list.append(pixel_list[l])
+
+for i in range(10, 13):
+    pixel_list = image_to_pixels('img_0{}.tif'.format(i))
+    for l in range(len(pixel_list)):
+        image_pixel_list.append(pixel_list[l])
+
+for i in range(100, 501):
+    pixel_list = image_to_pixels('img_{}.tif'.format(i))
+    for l in range(len(pixel_list)):
+        image_pixel_list.append(pixel_list[l])
+
+
+print(max(pixel_list))
+max_pixels = []
+max_test_array = np.array(image_pixel_list).reshape(12, height*width)
+
+for y in range(12):
+    max_pixels.append(max(max_test_array[y]))
+
+image_array = np.array(image_pixel_list).reshape(12, height, width)
+'''
+
+
+particles_set = 0
+particles = None
+
+
+for n in range(len(image_array)):
+    particles = particle_filter(image_array[n], particles, particles_set)
+    #particles = particle_filter(image_array[n], particles, particles_set, max_pixels[n])
+    print(n)
+    particles_set = 1
+    #plt.savefig('PF_Presentation1{}.jpg'.format(n), bbox_inches='tight')
+
+'''
+# Untouched movie
+
+for n in range(len(image_array)):
+    plt.imshow(image_array[n], cmap=cm.gray)
+    print(n)
+    plt.savefig('Dataset_1_Recording_1_NoPF{}.jpg'.format(n), bbox_inches='tight')
+'''
+
+plt.show()
